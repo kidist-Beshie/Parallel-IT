@@ -8,23 +8,54 @@ This project runs distributed PPO training using Ray RLlib on the Grid5000 clust
 - results/: logs, plots, metrics
 
 ## How to run
-Single node:
-    python src/train.py
+Launch ray on diffrent nodes:
+- head:
+    cluster/setup_head.sh
+- worker:
+    setup_worker.sh <HEAD-IP>
 
-Multi node:
-    python src/train2.py
-# REPORT
+
+# REPORT: Distributed RL Benchmarking on Grid'5000
 
 ## Section: Scaling Observations
 
-Our results demonstrate **Amdahl's Law** in practice. While we increased the computational resources (nodes and workers), we observed a significant performance penalty when moving from a single-node to a multi-node configuration. The execution time for 2 workers increased by ~44% when moving to 2 nodes, representing the latency overhead of inter-node communication over the Grid'5000 fabric.
+Our results demonstrate **Amdahl's Law** in practice. While we increased the computational resources (nodes and workers), we observed a significant performance penalty when moving from a single-node to a multi-node configuration. 
+
+The table below highlights the "Network Tax" paid when distributing the same workload across the cluster:
+
+| Nodes | Workers | Total Time (s) | Latency Penalty vs. 1-Node |
+| :--- | :--- | :--- | :--- |
+| **1 (Local)** | 2 | 94.03s | 0% (Baseline) |
+| **2 (Dist.)** | 2 | 136.81s | **+45.5%** |
+| **3 (Dist.)** | 2 | 138.28s | **+47.1%** |
+| **4 (Dist.)** | 2 | 135.42s | **+44.0%** |
+
+**Analysis:** The jump from 1 node to 2 nodes introduces a massive latency spike due to inter-node communication over the Grid'5000 fabric. Interestingly, moving from 2 to 4 nodes does not significantly increase this penalty further, suggesting that the initial transition to a distributed state (moving from shared memory to network TCP/IP) is the most "expensive" architectural step.
+
+
 
 ## Section: Efficiency Bottlenecks
 
-The **CartPole-v1** environment is computationally "light." Consequently, the "worker coordination overhead" dominates the execution time. This is evident in the 3-node test, where increasing the worker count from 24 to 64 only resulted in a negligible change in execution time (~114s to ~115s). The system is bottlenecked by the Head node's ability to aggregate results rather than the workers' ability to simulate the environment.
+The **CartPole-v1** environment is computationally "light." Consequently, the "worker coordination overhead" dominates the execution time. This is evident across all multi-node tests:
+
+* **3-Node Test:** 24 to 64 workers → ~114s to ~115s.
+* **4-Node Test:** 24 to 64 workers → ~116s to ~115s.
+
+The system is bottlenecked by the **Head node's ability to aggregate results** (the sequential portion of the task). Adding more nodes or workers beyond a certain point yields **zero speedup**, as the time saved by parallel physics simulation is entirely consumed by the overhead of managing a larger number of remote heartbeats and data buffers.
+
+
 
 ## Section: Learning Performance
 
-Higher worker counts did not lead to higher rewards within the 10-iteration window. In fact, the 1-node configuration achieved the maximum reward (500) more consistently. This suggests that for simple tasks like CartPole, a smaller, more "agile" worker configuration allows for more frequent policy updates, leading to faster convergence than large-scale distributed batches.
+Contrary to intuition, higher worker counts did not lead to higher rewards within our 10-iteration window. In fact, the most distributed configurations (e.g., 4 nodes with 64 workers) often showed slower reward growth compared to the single-node baseline.
 
+This is likely due to the **increased effective batch size**. With 64 workers, the agent collects a massive amount of data before each policy update. For simple environments, this makes the learning updates "coarse" and less efficient than the frequent, nimble updates possible on a single node. This represents a classic trade-off in RL between **throughput** (samples collected per second) and **sample efficiency** (how much the agent learns from each sample).
+
+## Conclusion
+
+This experiment highlights that horizontal scaling is not a "magic button" for performance. For small-scale problems like CartPole, the communication latency between nodes on the Grid'5000 cluster creates a performance floor. Distributed computing is most effective when the environment is computationally heavy, where the time spent calculating physics outweighs the time spent sending data over the network.
+
+---
+
+### Final Visualization
 ![Benchmark scaling and learning curves](./src/master_report_plots.png)
