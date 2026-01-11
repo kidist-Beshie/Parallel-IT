@@ -76,4 +76,4 @@ This experiment highlights that horizontal scaling is not a "magic button" for p
 ---
 
 ### Final Visualization
-![Benchmark scaling and learning curves](./src/master_report_plots.png)
+![Benchmark scaling and learning curves](./results/master_report_plots.png)
