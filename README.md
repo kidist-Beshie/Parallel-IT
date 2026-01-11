@@ -30,7 +30,25 @@ The table below highlights the "Network Tax" paid when distributing the same wor
 | **3 (Dist.)** | 2 | 138.28s | **+47.1%** |
 | **4 (Dist.)** | 2 | 135.42s | **+44.0%** |
 
-**Analysis:** The jump from 1 node to 2 nodes introduces a massive latency spike due to inter-node communication over the Grid'5000 fabric. Interestingly, moving from 2 to 4 nodes does not significantly increase this penalty further, suggesting that the initial transition to a distributed state (moving from shared memory to network TCP/IP) is the most "expensive" architectural step.
+The table below compares the performance of each cluster at its **highest tested worker capacity**:
+
+| Nodes | Max Workers Tested | Total Time (s) | Efficiency vs. 1-Node |
+| :--- | :--- | :--- | :--- |
+| **1 (Local)** | 8 | **81.61s** | **100% (Fastest)** |
+| **2 (Dist.)** | 48 | 113.90s | 71.6% (Slower) |
+| **3 (Dist.)** | 64 | 115.18s | 70.8% (Slower) |
+| **4 (Dist.)** | 64 | 115.95s | 70.4% (Slower) |
+
+The table below highlights the **fastest execution time** achieved for each node configuration:
+
+| Nodes | Fastest Worker Config | Total Time (s) | Efficiency vs. 1-Node |
+| :--- | :--- | :--- | :--- |
+| **1 (Local)** | 8 Workers | **81.61s** | **100% (Baseline)** |
+| **2 (Dist.)** | 24 Workers | 113.34s | 72.0% |
+| **3 (Dist.)** | 32 Workers | 113.52s | 71.9% |
+| **4 (Dist.)** | 2 Workers | 135.42s | 60.2% |
+
+**Analysis:** The data shows a "Scaling Wall." The fastest execution occurred on a single node with 8 workers. As soon as the workload was distributed (2+ nodes), the execution time jumped by ~30 seconds and stayed there, regardless of how many more nodes or workers were added. This proves that the **Inter-node Latency** (TCP/IP communication) is the primary bottleneck, not the number of CPUs.
 
 
 
